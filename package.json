@@ -2,10 +2,13 @@
   "name": "cityguide-backend",
   "version": "1.0.0",
   "description": "CityGuide Backend API",
-  "main": "server.js",
+  "main": "production-server.js",
+  "engines": {
+    "node": ">=18.x"
+  },
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node production-server.js",
+    "dev": "nodemon production-server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

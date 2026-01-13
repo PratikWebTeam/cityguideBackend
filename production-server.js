@@ -8,7 +8,7 @@ const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || 'cityguide_secret_key_2024';
 const JWT_EXPIRY = '7d';
 const MONGO_URI = process.env.MONGO_URI;

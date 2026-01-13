@@ -14,7 +14,7 @@ const placeSubmissionSchema = new mongoose.Schema({
   city: {
     type: String,
     required: [true, 'City is required'],
-    enum: ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 'Pune', 'Ahmedabad', 'Jaipur', 'Lucknow']
+    trim: true
   },
   description: {
     type: String,
