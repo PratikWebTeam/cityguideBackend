@@ -1,34 +1,42 @@
 const nodemailer = require('nodemailer');
 const sgMail = require('@sendgrid/mail');
 
-// Check if using SendGrid
-const useSendGrid = process.env.SENDGRID_API_KEY && 
-                    process.env.SENDGRID_API_KEY !== 'your-sendgrid-api-key' &&
-                    process.env.SENDGRID_API_KEY.startsWith('SG.');
+/**
+ * Determine if SendGrid should be used
+ */
+const useSendGrid =
+  !!process.env.SENDGRID_API_KEY &&
+  process.env.SENDGRID_API_KEY.startsWith('SG.') &&
+  !!process.env.SENDGRID_FROM_EMAIL;
 
-// Debug logging
-console.log('🔍 SendGrid Configuration Check:');
-console.log('  SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
-console.log('  SENDGRID_API_KEY value:', process.env.SENDGRID_API_KEY ? `${process.env.SENDGRID_API_KEY.substring(0, 10)}...` : 'NOT SET');
-console.log('  SENDGRID_FROM_EMAIL:', process.env.SENDGRID_FROM_EMAIL || 'NOT SET');
+/**
+ * Debug info (safe to keep)
+ */
+console.log('🔍 Email Configuration Check');
 console.log('  useSendGrid:', useSendGrid);
+console.log('  SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET');
+console.log('  SENDGRID_FROM_EMAIL:', process.env.SENDGRID_FROM_EMAIL || 'NOT SET');
+console.log('  EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
 
-// Create email transporter (for Gmail fallback)
-const createTransporter = () => {
-  const transporter = nodemailer.createTransport({
+/**
+ * Gmail transporter (LOCAL DEV ONLY)
+ */
+const createGmailTransporter = () => {
+  return nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
+      pass: process.env.EMAIL_PASSWORD,
+    },
   });
-  return transporter;
 };
 
-// Send OTP email
+/**
+ * Send OTP Email
+ */
 const sendOTPEmail = async (email, name, otp) => {
   try {
-    // ALWAYS log OTP to console for easy testing
+    // Always log OTP (dev friendly)
     console.log('\n' + '='.repeat(60));
     console.log('📧 OTP EMAIL');
     console.log('='.repeat(60));
@@ -37,134 +45,93 @@ const sendOTPEmail = async (email, name, otp) => {
     console.log(`🔐 OTP Code: ${otp}`);
     console.log(`⏰ Expires: 10 minutes`);
     console.log('='.repeat(60) + '\n');
-    
-    // HTML email template
+
+    /**
+     * Email HTML
+     */
     const htmlTemplate = `
       <!DOCTYPE html>
       <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-          }
-          .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-            border-radius: 10px 10px 0 0;
-          }
-          .content {
-            background: #f9f9f9;
-            padding: 30px;
-            border-radius: 0 0 10px 10px;
-          }
-          .otp-box {
-            background: white;
-            border: 2px dashed #667eea;
-            padding: 20px;
-            text-align: center;
-            margin: 20px 0;
-            border-radius: 10px;
-          }
-          .otp-code {
-            font-size: 32px;
-            font-weight: bold;
-            color: #667eea;
-            letter-spacing: 5px;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 20px;
-            color: #666;
-            font-size: 12px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
+      <body style="font-family: Arial, sans-serif; background:#f4f4f4; padding:20px;">
+        <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:8px; overflow:hidden;">
+          <div style="background:#667eea; color:white; padding:20px; text-align:center;">
             <h1>🏙️ CityGuide</h1>
-            <p>Welcome to CityGuide!</p>
+            <p>Email Verification</p>
           </div>
-          <div class="content">
-            <h2>Hello ${name}!</h2>
-            <p>Thank you for registering with CityGuide. To complete your registration, please verify your email address.</p>
-            
-            <p>Your verification code is:</p>
-            
-            <div class="otp-box">
-              <div class="otp-code">${otp}</div>
+          <div style="padding:30px; color:#333;">
+            <h2>Hello ${name},</h2>
+            <p>Your OTP code is:</p>
+            <div style="font-size:32px; font-weight:bold; letter-spacing:6px; text-align:center; margin:20px 0;">
+              ${otp}
             </div>
-            
-            <p><strong>This code will expire in 10 minutes.</strong></p>
-            
-            <p>If you didn't request this code, please ignore this email.</p>
-            
-            <p>Best regards,<br>The CityGuide Team</p>
+            <p>This code is valid for <strong>10 minutes</strong>.</p>
+            <p>If you didn’t request this, please ignore this email.</p>
+            <p>— CityGuide Team</p>
           </div>
-          <div class="footer">
-            <p>This is an automated email. Please do not reply.</p>
-            <p>&copy; 2026 CityGuide. All rights reserved.</p>
+          <div style="text-align:center; padding:15px; font-size:12px; color:#777;">
+            © 2026 CityGuide
           </div>
         </div>
       </body>
       </html>
     `;
-    
-    // Check if using SendGrid
+
+    /**
+     * ===============================
+     * SENDGRID (PRODUCTION)
+     * ===============================
+     */
     if (useSendGrid) {
-      console.log('📧 Using SendGrid for email delivery');
+      console.log('📧 Sending via SendGrid');
+
       sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-      
+
       const msg = {
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER,
+        from: process.env.SENDGRID_FROM_EMAIL, // MUST be verified
         subject: 'Verify Your CityGuide Account',
-        html: htmlTemplate
+        html: htmlTemplate,
       };
-      
+
       await sgMail.send(msg);
-      console.log('✅ Email sent via SendGrid to:', email);
-      return { success: true, messageId: 'sendgrid-' + Date.now() };
+      console.log('✅ Email sent via SendGrid');
+
+      return { success: true, provider: 'sendgrid' };
     }
-    
-    // DEVELOPMENT MODE: Only log to console, don't send email
-    const isDevelopment = !process.env.EMAIL_USER || process.env.EMAIL_USER === 'your-email@gmail.com';
-    
-    if (isDevelopment) {
-      console.log('📧 DEVELOPMENT MODE - Email not sent (console only)');
-      return { success: true, messageId: 'dev-mode-' + Date.now() };
+
+    /**
+     * ===============================
+     * DEVELOPMENT MODE (NO EMAIL)
+     * ===============================
+     */
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      console.log('⚠️ DEV MODE: Email not sent (no credentials)');
+      return { success: true, provider: 'dev-console' };
     }
-    
-    // GMAIL FALLBACK: Send actual email via Gmail (for local development)
-    console.log('📧 Using Gmail for email delivery');
-    const transporter = createTransporter();
-    
-    const mailOptions = {
+
+    /**
+     * ===============================
+     * GMAIL (LOCAL DEV ONLY)
+     * ===============================
+     */
+    console.log('📧 Sending via Gmail (DEV ONLY)');
+
+    const transporter = createGmailTransporter();
+
+    await transporter.sendMail({
       from: `"CityGuide" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Verify Your CityGuide Account',
-      html: htmlTemplate
-    };
-    
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent via Gmail:', info.messageId);
-    return { success: true, messageId: info.messageId };
-    
+      html: htmlTemplate,
+    });
+
+    console.log('✅ Email sent via Gmail');
+    return { success: true, provider: 'gmail' };
+
   } catch (error) {
     console.error('❌ Email sending failed:', error);
-    throw new Error('Failed to send email');
+    throw new Error('Failed to send OTP email');
   }
 };
 
-module.exports = {
-  sendOTPEmail
-};
+module.exports = { sendOTPEmail };
