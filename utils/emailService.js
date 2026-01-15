@@ -10,7 +10,7 @@ const useSendGrid =
   !!process.env.SENDGRID_FROM_EMAIL;
 
 /**
- * Debug info (safe to keep)
+ * Debug info
  */
 console.log('🔍 Email Configuration Check');
 console.log('  useSendGrid:', useSendGrid);
@@ -36,7 +36,6 @@ const createGmailTransporter = () => {
  */
 const sendOTPEmail = async (email, name, otp) => {
   try {
-    // Always log OTP (dev friendly)
     console.log('\n' + '='.repeat(60));
     console.log('📧 OTP EMAIL');
     console.log('='.repeat(60));
@@ -46,30 +45,22 @@ const sendOTPEmail = async (email, name, otp) => {
     console.log(`⏰ Expires: 10 minutes`);
     console.log('='.repeat(60) + '\n');
 
-    /**
-     * Email HTML
-     */
     const htmlTemplate = `
       <!DOCTYPE html>
       <html>
       <body style="font-family: Arial, sans-serif; background:#f4f4f4; padding:20px;">
-        <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:8px; overflow:hidden;">
+        <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:8px;">
           <div style="background:#667eea; color:white; padding:20px; text-align:center;">
             <h1>🏙️ CityGuide</h1>
             <p>Email Verification</p>
           </div>
-          <div style="padding:30px; color:#333;">
+          <div style="padding:30px;">
             <h2>Hello ${name},</h2>
             <p>Your OTP code is:</p>
-            <div style="font-size:32px; font-weight:bold; letter-spacing:6px; text-align:center; margin:20px 0;">
+            <div style="font-size:32px; font-weight:bold; letter-spacing:6px; text-align:center;">
               ${otp}
             </div>
-            <p>This code is valid for <strong>10 minutes</strong>.</p>
-            <p>If you didn’t request this, please ignore this email.</p>
-            <p>— CityGuide Team</p>
-          </div>
-          <div style="text-align:center; padding:15px; font-size:12px; color:#777;">
-            © 2026 CityGuide
+            <p>This code is valid for 10 minutes.</p>
           </div>
         </div>
       </body>
@@ -77,9 +68,7 @@ const sendOTPEmail = async (email, name, otp) => {
     `;
 
     /**
-     * ===============================
      * SENDGRID (PRODUCTION)
-     * ===============================
      */
     if (useSendGrid) {
       console.log('📧 Sending via SendGrid');
@@ -88,34 +77,29 @@ const sendOTPEmail = async (email, name, otp) => {
 
       const msg = {
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL, // MUST be verified
+        from: process.env.SENDGRID_FROM_EMAIL, // MUST be VERIFIED
         subject: 'Verify Your CityGuide Account',
+        text: `Your OTP is ${otp}. It expires in 10 minutes.`,
         html: htmlTemplate,
       };
 
       await sgMail.send(msg);
       console.log('✅ Email sent via SendGrid');
-
       return { success: true, provider: 'sendgrid' };
     }
 
     /**
-     * ===============================
-     * DEVELOPMENT MODE (NO EMAIL)
-     * ===============================
+     * DEV MODE (NO EMAIL)
      */
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.log('⚠️ DEV MODE: Email not sent (no credentials)');
+      console.log('⚠️ DEV MODE: Email not sent');
       return { success: true, provider: 'dev-console' };
     }
 
     /**
-     * ===============================
      * GMAIL (LOCAL DEV ONLY)
-     * ===============================
      */
     console.log('📧 Sending via Gmail (DEV ONLY)');
-
     const transporter = createGmailTransporter();
 
     await transporter.sendMail({
@@ -129,7 +113,20 @@ const sendOTPEmail = async (email, name, otp) => {
     return { success: true, provider: 'gmail' };
 
   } catch (error) {
-    console.error('❌ Email sending failed:', error);
+    console.error('❌ Email sending failed');
+
+    // 🔥 THIS IS THE MOST IMPORTANT PART
+    if (error.response?.body?.errors) {
+      error.response.body.errors.forEach((err, index) => {
+        console.error(`❌ SendGrid Error ${index + 1}:`);
+        console.error('   Message:', err.message);
+        console.error('   Field:', err.field);
+        console.error('   Help:', err.help);
+      });
+    } else {
+      console.error(error);
+    }
+
     throw new Error('Failed to send OTP email');
   }
 };
